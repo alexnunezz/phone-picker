@@ -91,11 +91,7 @@ const UPCOMING_RELEASES: UpcomingRelease[] = [
 ];
 
 // ---------- Server fetch ----------
-// ---------- Server fetch ----------
-// ---------- Server fetch ----------
-import { headers } from "next/headers";
 
-// ---------- Server fetch ----------
 // ---------- Server fetch ----------
 async function getRecommendations(): Promise<{ data: ApiPayload; error?: string }> {
   // Build absolute URL for the current request (works local + Vercel)
