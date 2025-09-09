@@ -1,4 +1,5 @@
 // app/page.tsx
+import { headers } from "next/headers";
 
 // ---------- Types (match /api/recommendations) ----------
 type Platform = "iOS" | "Android";
@@ -90,18 +91,31 @@ const UPCOMING_RELEASES: UpcomingRelease[] = [
 
 // ---------- Server fetch ----------
 // ---------- Server fetch ----------
+// ---------- Server fetch ----------
+function getInternalBaseUrl(): string {
+  const h = headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
 async function getRecommendations(): Promise<{ data: ApiPayload; error?: string }> {
+  const url = `${getInternalBaseUrl()}/api/recommendations`;
   try {
-    // Relative path = same-origin, works even with Vercel Deployment Protection
-    const res = await fetch('/api/recommendations', { cache: 'no-store' });
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: process.env.VERCEL_DEPLOYMENT_PROTECTION_BYPASS
+        ? { "x-vercel-protection-bypass": process.env.VERCEL_DEPLOYMENT_PROTECTION_BYPASS as string }
+        : undefined,
+    });
     if (!res.ok) {
       const body = await res.text();
-      return { data: FALLBACK, error: `GET /api/recommendations → ${res.status} ${body.slice(0, 120)}` };
+      return { data: FALLBACK, error: `GET ${url} → ${res.status} ${body.slice(0, 120)}` };
     }
     const json = (await res.json()) as ApiPayload;
     return { data: json };
   } catch (e) {
-    return { data: FALLBACK, error: `GET /api/recommendations failed: ${String(e)}` };
+    return { data: FALLBACK, error: `GET ${url} failed: ${String(e)}` };
   }
 }
 
