@@ -81,18 +81,18 @@ const FALLBACK: ApiPayload = {
   freshnessDays: 0,
 };
 
-// Upcoming releases (simple static source of truth)
+// ---------- "What's Next" (static) ----------
 type UpcomingRelease = {
   brand: "Apple" | "Google" | "Samsung";
   model: string;
-  expected: string;   // e.g., "2025 · Q3"
+  expected: string; // e.g., "2025 · Q3"
   note?: string;
 };
 
 const UPCOMING_RELEASES: UpcomingRelease[] = [
-  { brand: "Apple",   model: "iPhone 17",                 expected: "2025 · Q3", note: "Typical September launch" },
-  { brand: "Google",  model: "Pixel 10",                  expected: "2025 · Q4", note: "Typical October launch" },
-  { brand: "Samsung", model: "Galaxy S26 / S26 Ultra",    expected: "2026 · Q1", note: "Typical Jan–Feb launch" },
+  { brand: "Apple",   model: "iPhone 17",              expected: "2025 · Q3", note: "Typical September launch" },
+  { brand: "Google",  model: "Pixel 10",               expected: "2025 · Q4", note: "Typical October launch" },
+  { brand: "Samsung", model: "Galaxy S26 / S26 Ultra", expected: "2026 · Q1", note: "Typical Jan–Feb launch" },
 ];
 
 // ---------- Server fetch ----------
@@ -140,7 +140,7 @@ function selectPerPlatform(
   const iosSel = iosQueue.splice(0, iosTarget);
   const andSel = androidQueue.splice(0, androidTarget);
 
-  // No cross-fill; we show as many as each platform can provide.
+  // No cross-fill; show what each platform has.
   const selected: Recommendation[] = [...iosSel, ...andSel];
 
   return { selected, iosCount: iosSel.length, androidCount: andSel.length };
@@ -152,7 +152,7 @@ export default async function Page({
 }: {
   searchParams?: Search;
 }) {
-  // Defaults: 4 per platform; user can request up to 10 each (?ios=, ?android=)
+  // Defaults 4/4, user may request up to 10 each: ?ios=7&android=9
   const iosTarget = readInt(searchParams, "ios", 4, 1, 10);
   const androidTarget = readInt(searchParams, "android", 4, 1, 10);
 
@@ -282,7 +282,7 @@ export default async function Page({
           </tbody>
         </table>
         <div style={{ marginTop: 10 }}>
-          <a href={`/api/recommendations?format=csv`} style={{ fontSize: 13, color: "#93c5fd", textDecoration: "underline" }}>
+          <a href="/api/recommendations?format=csv" style={{ fontSize: 13, color: "#93c5fd", textDecoration: "underline" }}>
             Download CSV
           </a>
         </div>
@@ -323,6 +323,34 @@ export default async function Page({
           </tbody>
         </table>
         <p style={{ marginTop: 6, fontSize: 12, color: "#9ca3af" }}>Month: {data.vendorShare.month}</p>
+      </section>
+
+      {/* What's Next */}
+      <section style={{ marginTop: 32 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, color: "#fff" }}>What’s Next (upcoming releases)</h2>
+        <table style={{ marginTop: 8, width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left", borderBottom: "1px solid #374151", padding: 8 }}>Brand</th>
+              <th style={{ textAlign: "left", borderBottom: "1px solid #374151", padding: 8 }}>Model</th>
+              <th style={{ textAlign: "left", borderBottom: "1px solid #374151", padding: 8 }}>Expected</th>
+              <th style={{ textAlign: "left", borderBottom: "1px solid #374151", padding: 8 }}>Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            {UPCOMING_RELEASES.map((u, i) => (
+              <tr key={`${u.brand}-${u.model}-${i}`}>
+                <td style={{ padding: 8, borderBottom: "1px solid #262626" }}>{u.brand}</td>
+                <td style={{ padding: 8, borderBottom: "1px solid #262626", fontWeight: 600 }}>{u.model}</td>
+                <td style={{ padding: 8, borderBottom: "1px solid #262626" }}>{u.expected}</td>
+                <td style={{ padding: 8, borderBottom: "1px solid #262626" }}>{u.note ?? ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p style={{ marginTop: 6, fontSize: 12, color: "#9ca3af" }}>
+          Dates are indicative based on typical launch windows and may change.
+        </p>
       </section>
 
       {/* Sources */}
