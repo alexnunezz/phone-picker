@@ -1,9 +1,17 @@
 // app/page.tsx
 
 // ---------- Types matching /api/recommendations ----------
-type Recommendation = { platform: "iOS" | "Android"; model: string; why: string };
+type Platform = "iOS" | "Android";
+
+type Recommendation = {
+  platform: Platform;
+  model: string;
+  why: string;
+};
+
 type IPhoneModel = { model: string; share: number };
 type VendorShare = { vendor: string; share: number };
+
 type ApiPayload = {
   anchors: {
     latestStandardIphone: string;
@@ -23,7 +31,7 @@ type ApiPayload = {
 };
 
 // ---------- Base URL helper (works on Vercel & locally) ----------
-function getBaseUrl() {
+function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return "http://localhost:3000";
@@ -73,6 +81,89 @@ const FALLBACK: ApiPayload = {
   freshnessDays: 0,
 };
 
+// ---------- Data fetch ----------
 async function getRecommendations(): Promise<{ data: ApiPayload; error?: string }> {
   const url = `${getBaseUrl()}/api/recommendations`;
   try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) {
+      const body = await res.text();
+      return { data: FALLBACK, error: `GET ${url} → ${res.status} ${body.slice(0, 120)}` };
+    }
+    const json = (await res.json()) as ApiPayload;
+    return { data: json };
+  } catch (e) {
+    return { data: FALLBACK, error: `GET ${url} failed: ${String(e)}` };
+  }
+}
+
+// ---------- Helpers ----------
+type Search = Record<string, string | string[] | undefined>;
+
+function readTotal(params?: Search): number {
+  const raw = params?.total;
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 8; // default total
+  return Math.max(8, Math.min(10, Math.floor(n))); // clamp 8..10
+}
+
+function isPolicy(rec: Recommendation): boolean {
+  return rec.why.toLowerCase().startsWith("policy");
+}
+
+function pickByPlatform(
+  recs: Recommendation[],
+  total: number,
+  iosBase: number,
+  androidBase: number
+): { selected: Recommendation[]; iosCount: number; androidCount: number } {
+  const iosAll = recs.filter((r) => r.platform === "iOS");
+  const androidAll = recs.filter((r) => r.platform === "Android");
+
+  const iosQueue = [...iosAll.filter(isPolicy), ...iosAll.filter((r) => !isPolicy(r))];
+  const androidQueue = [...androidAll.filter(isPolicy), ...androidAll.filter((r) => !isPolicy(r))];
+
+  // Base: 4 + 4
+  let iosTarget = iosBase;
+  let androidTarget = androidBase;
+
+  // Distribute extras: total 9 => 5+4, total 10 => 5+5
+  const extra = total - (iosBase + androidBase);
+  if (extra > 0) iosTarget += 1;
+  if (extra > 1) androidTarget += 1;
+
+  const iosSel = iosQueue.splice(0, iosTarget);
+  const andSel = androidQueue.splice(0, androidTarget);
+
+  const selected: Recommendation[] = [...iosSel, ...andSel];
+
+  // Fill remaining if we still haven't reached total
+  while (selected.length < total && (iosQueue.length || androidQueue.length)) {
+    if (iosQueue.length) selected.push(iosQueue.shift()!);
+    if (selected.length >= total) break;
+    if (androidQueue.length) selected.push(androidQueue.shift()!);
+  }
+
+  return { selected, iosCount: iosSel.length, androidCount: andSel.length };
+}
+
+// ---------- DEFAULT EXPORT: the page component ----------
+export default async function Page({
+  searchParams,
+}: {
+  searchParams?: Search;
+}) {
+  const total = readTotal(searchParams);
+  const { data, error } = await getRecommendations();
+
+  const { selected, iosCount, androidCount } = pickByPlatform(
+    data.recommendations,
+    total,
+    /* iosBase */ 4,
+    /* androidBase */ 4
+  );
+
+  return (
+    <main style={{ padding: 24, fontFamily: "ui-sans-serif, system-ui", color: "#e5e7eb", background: "#0b0b0b" }}>
+      <h1 style={
