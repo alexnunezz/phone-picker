@@ -1,8 +1,9 @@
 // app/page.tsx
 import { headers, cookies } from "next/headers";
 
-
-// ---------- Types (match /api/recommendations) ----------
+/* =========================
+   Types
+   ========================= */
 type Platform = "iOS" | "Android";
 
 type Recommendation = {
@@ -32,7 +33,9 @@ type ApiPayload = {
   freshnessDays: number;
 };
 
-// ---------- Fallback payload (if API fails) ----------
+/* =========================
+   Fallback payload (used if API fails)
+   ========================= */
 const FALLBACK: ApiPayload = {
   anchors: {
     latestStandardIphone: "iPhone 16",
@@ -76,11 +79,13 @@ const FALLBACK: ApiPayload = {
   freshnessDays: 0,
 };
 
-// ---------- "What's Next" (static) ----------
+/* =========================
+   What's Next (static)
+   ========================= */
 type UpcomingRelease = {
   brand: "Apple" | "Google" | "Samsung";
   model: string;
-  expected: string; // e.g., "2025 · Q3"
+  expected: string;
   note?: string;
 };
 
@@ -90,112 +95,9 @@ const UPCOMING_RELEASES: UpcomingRelease[] = [
   { brand: "Samsung", model: "Galaxy S26 / S26 Ultra", expected: "2026 · Q1", note: "Typical Jan–Feb launch" },
 ];
 
-// ---------- Server fetch ----------
-
-// ---------- Server fetch ----------
-import { headers, cookies } from "next/headers";
-
-// ---------- Server fetch ----------
-async function getRecommendations(): Promise<{ data: ApiPayload; error?: string }> {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
-  const url = `${proto}://${host}/api/recommendations`;
-
-  // Forward viewer cookies (includes Vercel protection cookie if present)
-  const cookieStore = await cookies(); // <-- await here
-  const cookieHeader = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join("; ");
-
-  // Optional: add protection bypass header if you set it in Vercel
-  const hdrs: Record<string, string> = { cookie: cookieHeader };
-  if (process.env.VERCEL_DEPLOYMENT_PROTECTION_BYPASS) {
-    hdrs["x-vercel-protection-bypass"] =
-      process.env.VERCEL_DEPLOYMENT_PROTECTION_BYPASS as string;
-  }
-
-  try {
-    const res = await fetch(url, { cache: "no-store", headers: hdrs });
-    if (!res.ok) {
-      const body = await res.text();
-      return { data: FALLBACK, error: `GET ${url} → ${res.status} ${body.slice(0, 120)}` };
-    }
-    const json = (await res.json()) as ApiPayload;
-    return { data: json };
-  } catch (e) {
-    return { data: FALLBACK, error: `GET ${url} failed: ${String(e)}` };
-  }
-}
-
-  // Forward viewer cookies (includes Vercel protection cookie, if present)
-// Option B: one line
-const cookieHeader = (await cookies()).getAll().map(c => `${c.name}=${c.value}`).join("; ");
-
-  // Optional: add protection bypass header if you set the env var in Vercel
-  const hdrs: Record<string, string> = { cookie: cookieHeader };
-  if (process.env.VERCEL_DEPLOYMENT_PROTECTION_BYPASS) {
-    hdrs["x-vercel-protection-bypass"] =
-      process.env.VERCEL_DEPLOYMENT_PROTECTION_BYPASS as string;
-  }
-
-  try {
-    const res = await fetch(url, { cache: "no-store", headers: hdrs });
-    if (!res.ok) {
-      const body = await res.text();
-      return { data: FALLBACK, error: `GET ${url} → ${res.status} ${body.slice(0, 120)}` };
-    }
-    const json = (await res.json()) as ApiPayload;
-    return { data: json };
-  } catch (e) {
-    return { data: FALLBACK, error: `GET ${url} failed: ${String(e)}` };
-  }
-}
-
-
-  // Forward the viewer's cookies (includes the protection cookie if present)
-  const cookieHeader = cookies().getAll().map(c => `${c.name}=${c.value}`).join("; ");
-
-  try {
-    const res = await fetch(url, {
-      cache: "no-store",
-      headers: {
-        cookie: cookieHeader,
-      },
-    });
-
-    if (!res.ok) {
-      const body = await res.text();
-      return { data: FALLBACK, error: `GET ${url} → ${res.status} ${body.slice(0, 120)}` };
-    }
-
-    const json = (await res.json()) as ApiPayload;
-    return { data: json };
-  } catch (e) {
-    return { data: FALLBACK, error: `GET ${url} failed: ${String(e)}` };
-  }
-
-
-
-  try {
-    const res = await fetch(url, {
-      cache: "no-store",
-      headers: process.env.VERCEL_DEPLOYMENT_PROTECTION_BYPASS
-        ? { "x-vercel-protection-bypass": process.env.VERCEL_DEPLOYMENT_PROTECTION_BYPASS as string }
-        : undefined,
-    });
-
-    if (!res.ok) {
-      const body = await res.text();
-      return { data: FALLBACK, error: `GET ${url} → ${res.status} ${body.slice(0, 120)}` };
-    }
-
-    const json = (await res.json()) as ApiPayload;
-    return { data: json };
-  } catch (e) {
-    return { data: FALLBACK, error: `GET ${url} failed: ${String(e)}` };
-  }
-
-
-// ---------- Helpers ----------
+/* =========================
+   Helpers
+   ========================= */
 type Search = Record<string, string | string[] | undefined>;
 
 function readInt(params: Search | undefined, key: string, def: number, min = 1, max = 10): number {
@@ -224,19 +126,45 @@ function selectPerPlatform(
   const iosSel = iosQueue.splice(0, iosTarget);
   const andSel = androidQueue.splice(0, androidTarget);
 
-  // No cross-fill; show what each platform has.
-  const selected: Recommendation[] = [...iosSel, ...andSel];
-
-  return { selected, iosCount: iosSel.length, androidCount: andSel.length };
+  return { selected: [...iosSel, ...andSel], iosCount: iosSel.length, androidCount: andSel.length };
 }
 
-// ---------- Page (default export) ----------
-export default async function Page({
-  searchParams,
-}: {
-  searchParams?: Search;
-}) {
-  // Defaults 4/4, user may request up to 10 each: ?ios=7&android=9
+/* =========================
+   Server fetch (absolute URL from headers + cookies)
+   ========================= */
+async function getRecommendations(): Promise<{ data: ApiPayload; error?: string }> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
+  const url = `${proto}://${host}/api/recommendations`;
+
+  // Forward viewer cookies (includes Vercel protection cookie, if present)
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.getAll().map((c) => `${c.name}=${c.value}`).join("; ");
+
+  // Optional: add Vercel protection bypass header (set env var in Vercel)
+  const hdrs: Record<string, string> = { cookie: cookieHeader };
+  if (process.env.VERCEL_DEPLOYMENT_PROTECTION_BYPASS) {
+    hdrs["x-vercel-protection-bypass"] = process.env.VERCEL_DEPLOYMENT_PROTECTION_BYPASS as string;
+  }
+
+  try {
+    const res = await fetch(url, { cache: "no-store", headers: hdrs });
+    if (!res.ok) {
+      const body = await res.text();
+      return { data: FALLBACK, error: `GET ${url} → ${res.status} ${body.slice(0, 120)}` };
+    }
+    const json = (await res.json()) as ApiPayload;
+    return { data: json };
+  } catch (e) {
+    return { data: FALLBACK, error: `GET ${url} failed: ${String(e)}` };
+  }
+}
+
+/* =========================
+   Page
+   ========================= */
+export default async function Page({ searchParams }: { searchParams?: Search }) {
   const iosTarget = readInt(searchParams, "ios", 4, 1, 10);
   const androidTarget = readInt(searchParams, "android", 4, 1, 10);
 
