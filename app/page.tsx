@@ -1,4 +1,5 @@
 // app/page.tsx
+import { headers, cookies } from "next/headers";
 
 // ---------- Types (match /api/recommendations) ----------
 type Platform = "iOS" | "Android";
@@ -95,11 +96,35 @@ import { headers } from "next/headers";
 
 // ---------- Server fetch ----------
 async function getRecommendations(): Promise<{ data: ApiPayload; error?: string }> {
-  // Build absolute URL from current request headers
-  const h = await headers(); // <— important
+  // Build absolute URL from current request
+  const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
   const url = `${proto}://${host}/api/recommendations`;
+
+  // Forward the viewer's cookies (includes the protection cookie if present)
+  const cookieHeader = cookies().getAll().map(c => `${c.name}=${c.value}`).join("; ");
+
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: {
+        cookie: cookieHeader,
+      },
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      return { data: FALLBACK, error: `GET ${url} → ${res.status} ${body.slice(0, 120)}` };
+    }
+
+    const json = (await res.json()) as ApiPayload;
+    return { data: json };
+  } catch (e) {
+    return { data: FALLBACK, error: `GET ${url} failed: ${String(e)}` };
+  }
+}
+
 
   try {
     const res = await fetch(url, {
