@@ -1,5 +1,4 @@
 // app/page.tsx
-import { headers } from "next/headers";
 
 // ---------- Types (match /api/recommendations) ----------
 type Platform = "iOS" | "Android";
@@ -92,15 +91,16 @@ const UPCOMING_RELEASES: UpcomingRelease[] = [
 // ---------- Server fetch ----------
 // ---------- Server fetch ----------
 // ---------- Server fetch ----------
-function getInternalBaseUrl(): string {
-  const h = headers();
+import { headers } from "next/headers";
+
+// ---------- Server fetch ----------
+async function getRecommendations(): Promise<{ data: ApiPayload; error?: string }> {
+  // Build absolute URL from current request headers
+  const h = await headers(); // <— important
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
-  return `${proto}://${host}`;
-}
+  const url = `${proto}://${host}/api/recommendations`;
 
-async function getRecommendations(): Promise<{ data: ApiPayload; error?: string }> {
-  const url = `${getInternalBaseUrl()}/api/recommendations`;
   try {
     const res = await fetch(url, {
       cache: "no-store",
@@ -108,16 +108,19 @@ async function getRecommendations(): Promise<{ data: ApiPayload; error?: string 
         ? { "x-vercel-protection-bypass": process.env.VERCEL_DEPLOYMENT_PROTECTION_BYPASS as string }
         : undefined,
     });
+
     if (!res.ok) {
       const body = await res.text();
       return { data: FALLBACK, error: `GET ${url} → ${res.status} ${body.slice(0, 120)}` };
     }
+
     const json = (await res.json()) as ApiPayload;
     return { data: json };
   } catch (e) {
     return { data: FALLBACK, error: `GET ${url} failed: ${String(e)}` };
   }
 }
+
 
 
 // ---------- Helpers ----------
