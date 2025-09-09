@@ -33,24 +33,37 @@ const FALLBACK_VENDORS: VendorsResp = {
   ],
 };
 
+// ---------- Base URL helper (absolute URL for prod & dev) ----------
+function getBaseUrl() {
+  // If you set this in Vercel → Project → Settings → Environment Variables
+  // use that. Example value: https://phone-picker.vercel.app
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
+
+  // Vercel automatically sets VERCEL_URL in serverless/edge environments
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+
+  // Local dev
+  return "http://localhost:3000";
+}
+
 // ---------- Safe fetch helper (never throws) ----------
 async function safeFetch<T>(path: string, fallback: T): Promise<{ data: T; error?: string }> {
+  const url = `${getBaseUrl()}${path}`;
   try {
-    const res = await fetch(path, { cache: "no-store" });
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) {
       const body = await res.text();
-      return { data: fallback, error: `GET ${path} → ${res.status} ${body.slice(0, 120)}` };
+      return { data: fallback, error: `GET ${url} → ${res.status} ${body.slice(0, 120)}` };
     }
     const json = (await res.json()) as T;
     return { data: json };
   } catch (e) {
-    return { data: fallback, error: `GET ${path} failed: ${String(e)}` };
+    return { data: fallback, error: `GET ${url} failed: ${String(e)}` };
   }
 }
 
 // ---------- Page ----------
 export default async function Page() {
-  // Use *relative* paths so this works locally and on Vercel
   const [iphoneR, vendorsR] = await Promise.all([
     safeFetch<IPhoneModelsResp>("/api/iphone-models", FALLBACK_IPHONE),
     safeFetch<VendorsResp>("/api/us-vendors", FALLBACK_VENDORS),
