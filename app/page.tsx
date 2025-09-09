@@ -165,5 +165,35 @@ export default async function Page({
   );
 
   return (
-    <main style={{ padding: 24, fontFamily: "ui-sans-serif, system-ui", color: "#e5e7eb", background: "#0b0b0b" }}>
-      <h1 style={
+  <main
+    style={{
+      padding: 24,
+      fontFamily: "ui-sans-serif, system-ui",
+      color: "#e5e7eb",
+      background: "#0b0b0b",
+    }}
+  >
+    <h1 style={{ fontSize: 28, fontWeight: 600, color: "#fff" }}>
+      US Popular Phones — Test Device Picker
+    </h1>
+
+    {error && (
+      <div
+        style={{
+          marginTop: 16,
+          padding: 12,
+          borderRadius: 8,
+          background: "#FEF3C7",
+          color: "#78350F",
+          border: "1px solid #FDE68A",
+        }}
+      >
+        <strong>Note:</strong> Using fallback data because: {error}
+      </div>
+    )}
+
+    {/* …keep the rest of the sections exactly as in the file I sent (Controls, Recommended table, iPhone/Vendor sections, Sources)… */}
+
+  </main>
+);
+
