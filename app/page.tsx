@@ -81,6 +81,20 @@ const FALLBACK: ApiPayload = {
   freshnessDays: 0,
 };
 
+// Upcoming releases (simple static source of truth)
+type UpcomingRelease = {
+  brand: "Apple" | "Google" | "Samsung";
+  model: string;
+  expected: string;   // e.g., "2025 · Q3"
+  note?: string;
+};
+
+const UPCOMING_RELEASES: UpcomingRelease[] = [
+  { brand: "Apple",   model: "iPhone 17",                 expected: "2025 · Q3", note: "Typical September launch" },
+  { brand: "Google",  model: "Pixel 10",                  expected: "2025 · Q4", note: "Typical October launch" },
+  { brand: "Samsung", model: "Galaxy S26 / S26 Ultra",    expected: "2026 · Q1", note: "Typical Jan–Feb launch" },
+];
+
 // ---------- Server fetch ----------
 async function getRecommendations(): Promise<{ data: ApiPayload; error?: string }> {
   const url = `${getBaseUrl()}/api/recommendations`;
@@ -100,23 +114,22 @@ async function getRecommendations(): Promise<{ data: ApiPayload; error?: string 
 // ---------- Helpers ----------
 type Search = Record<string, string | string[] | undefined>;
 
-function readTotal(params?: Search): number {
-  const raw = params?.total;
+function readInt(params: Search | undefined, key: string, def: number, min = 1, max = 10): number {
+  const raw = params?.[key];
   const v = Array.isArray(raw) ? raw[0] : raw;
   const n = Number(v);
-  if (!Number.isFinite(n)) return 8; // default total
-  return Math.max(8, Math.min(10, Math.floor(n))); // clamp 8..10
+  if (!Number.isFinite(n)) return def;
+  return Math.max(min, Math.min(max, Math.floor(n)));
 }
 
 function isPolicy(rec: Recommendation): boolean {
   return rec.why.toLowerCase().startsWith("policy");
 }
 
-function pickByPlatform(
+function selectPerPlatform(
   recs: Recommendation[],
-  total: number,
-  iosBase: number,
-  androidBase: number
+  iosTarget: number,
+  androidTarget: number
 ): { selected: Recommendation[]; iosCount: number; androidCount: number } {
   const iosAll = recs.filter((r) => r.platform === "iOS");
   const androidAll = recs.filter((r) => r.platform === "Android");
@@ -124,25 +137,11 @@ function pickByPlatform(
   const iosQueue = [...iosAll.filter(isPolicy), ...iosAll.filter((r) => !isPolicy(r))];
   const androidQueue = [...androidAll.filter(isPolicy), ...androidAll.filter((r) => !isPolicy(r))];
 
-  // Base 4 + 4
-  let iosTarget = iosBase;
-  let androidTarget = androidBase;
-
-  // Extra slots beyond 8: 9→5+4, 10→5+5
-  const extra = total - (iosBase + androidBase);
-  if (extra > 0) iosTarget += 1;
-  if (extra > 1) androidTarget += 1;
-
   const iosSel = iosQueue.splice(0, iosTarget);
   const andSel = androidQueue.splice(0, androidTarget);
-  const selected: Recommendation[] = [...iosSel, ...andSel];
 
-  // Fill remaining, alternating if possible
-  while (selected.length < total && (iosQueue.length || androidQueue.length)) {
-    if (iosQueue.length) selected.push(iosQueue.shift()!);
-    if (selected.length >= total) break;
-    if (androidQueue.length) selected.push(androidQueue.shift()!);
-  }
+  // No cross-fill; we show as many as each platform can provide.
+  const selected: Recommendation[] = [...iosSel, ...andSel];
 
   return { selected, iosCount: iosSel.length, androidCount: andSel.length };
 }
@@ -153,9 +152,16 @@ export default async function Page({
 }: {
   searchParams?: Search;
 }) {
-  const total = readTotal(searchParams);
+  // Defaults: 4 per platform; user can request up to 10 each (?ios=, ?android=)
+  const iosTarget = readInt(searchParams, "ios", 4, 1, 10);
+  const androidTarget = readInt(searchParams, "android", 4, 1, 10);
+
   const { data, error } = await getRecommendations();
-  const { selected, iosCount, androidCount } = pickByPlatform(data.recommendations, total, 4, 4);
+  const { selected, iosCount, androidCount } = selectPerPlatform(
+    data.recommendations,
+    iosTarget,
+    androidTarget
+  );
 
   return (
     <main
@@ -186,17 +192,17 @@ export default async function Page({
       ) : null}
 
       {/* Controls */}
-      <form method="GET" style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 12 }}>
-        <label htmlFor="total" style={{ fontSize: 13, color: "#cbd5e1" }}>
-          Show how many devices (8–10):
+      <form method="GET" style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <label htmlFor="ios" style={{ fontSize: 13, color: "#cbd5e1" }}>
+          iOS (1–10):
         </label>
         <input
-          id="total"
-          name="total"
+          id="ios"
+          name="ios"
           type="number"
-          min={8}
+          min={1}
           max={10}
-          defaultValue={total}
+          defaultValue={iosTarget}
           style={{
             width: 70,
             padding: "6px 8px",
@@ -206,6 +212,27 @@ export default async function Page({
             color: "#e5e7eb",
           }}
         />
+
+        <label htmlFor="android" style={{ fontSize: 13, color: "#cbd5e1" }}>
+          Android (1–10):
+        </label>
+        <input
+          id="android"
+          name="android"
+          type="number"
+          min={1}
+          max={10}
+          defaultValue={androidTarget}
+          style={{
+            width: 90,
+            padding: "6px 8px",
+            borderRadius: 6,
+            border: "1px solid #334155",
+            background: "#111827",
+            color: "#e5e7eb",
+          }}
+        />
+
         <button
           type="submit"
           style={{
@@ -219,19 +246,12 @@ export default async function Page({
         >
           Apply
         </button>
+
         <div style={{ fontSize: 12, color: "#9ca3af" }}>
           Quick:{" "}
-          <a href="?total=8" style={{ color: "#93c5fd" }}>
-            8
-          </a>{" "}
-          ·{" "}
-          <a href="?total=9" style={{ color: "#93c5fd" }}>
-            9
-          </a>{" "}
-          ·{" "}
-          <a href="?total=10" style={{ color: "#93c5fd" }}>
-            10
-          </a>
+          <a href="?ios=4&android=4" style={{ color: "#93c5fd" }}>4/4</a>{" · "}
+          <a href="?ios=5&android=5" style={{ color: "#93c5fd" }}>5/5</a>{" · "}
+          <a href="?ios=10&android=10" style={{ color: "#93c5fd" }}>10/10</a>
         </div>
       </form>
 
@@ -241,7 +261,7 @@ export default async function Page({
         <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 6 }}>
           Confidence: <strong>{data.confidence.label.toUpperCase()}</strong> ({data.confidence.score})
           {" · "}Anchors updated {data.freshnessDays}d ago
-          {" · "}Showing {selected.length} (iOS {iosCount} / Android {androidCount})
+          {" · "}Showing iOS {iosCount} / Android {androidCount} (requested iOS {iosTarget}, Android {androidTarget})
         </div>
         <table style={{ marginTop: 8, width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
           <thead>
@@ -262,7 +282,7 @@ export default async function Page({
           </tbody>
         </table>
         <div style={{ marginTop: 10 }}>
-          <a href="/api/recommendations?format=csv" style={{ fontSize: 13, color: "#93c5fd", textDecoration: "underline" }}>
+          <a href={`/api/recommendations?format=csv`} style={{ fontSize: 13, color: "#93c5fd", textDecoration: "underline" }}>
             Download CSV
           </a>
         </div>
