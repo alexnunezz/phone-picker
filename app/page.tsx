@@ -30,13 +30,6 @@ type ApiPayload = {
   freshnessDays: number;
 };
 
-// ---------- Base URL helper ----------
-function getBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL as string;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return "http://localhost:3000";
-}
-
 // ---------- Fallback payload (if API fails) ----------
 const FALLBACK: ApiPayload = {
   anchors: {
@@ -96,20 +89,22 @@ const UPCOMING_RELEASES: UpcomingRelease[] = [
 ];
 
 // ---------- Server fetch ----------
+// ---------- Server fetch ----------
 async function getRecommendations(): Promise<{ data: ApiPayload; error?: string }> {
-  const url = `${getBaseUrl()}/api/recommendations`;
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    // Relative path = same-origin, works even with Vercel Deployment Protection
+    const res = await fetch('/api/recommendations', { cache: 'no-store' });
     if (!res.ok) {
       const body = await res.text();
-      return { data: FALLBACK, error: `GET ${url} → ${res.status} ${body.slice(0, 120)}` };
+      return { data: FALLBACK, error: `GET /api/recommendations → ${res.status} ${body.slice(0, 120)}` };
     }
     const json = (await res.json()) as ApiPayload;
     return { data: json };
   } catch (e) {
-    return { data: FALLBACK, error: `GET ${url} failed: ${String(e)}` };
+    return { data: FALLBACK, error: `GET /api/recommendations failed: ${String(e)}` };
   }
 }
+
 
 // ---------- Helpers ----------
 type Search = Record<string, string | string[] | undefined>;
