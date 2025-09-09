@@ -35,8 +35,7 @@ const FALLBACK_VENDORS: VendorsResp = {
 
 // ---------- Base URL helper (absolute URL for prod & dev) ----------
 function getBaseUrl() {
-  // Set this in Vercel → Project → Settings → Environment Variables (recommended):
-  // NEXT_PUBLIC_SITE_URL = https://phone-picker.vercel.app
+  // Recommended: set NEXT_PUBLIC_SITE_URL in Vercel → Settings → Environment Variables
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return "http://localhost:3000";
@@ -69,22 +68,29 @@ export default async function Page() {
   const vendors = vendorsR.data;
   const errors = [iphoneR.error, vendorsR.error].filter(Boolean) as string[];
 
-  // ===== New policy anchors (edit when new models launch) =====
-  // Rule: "Always use a Max model for iPhone and an Ultra model for Samsung — last year's models are fine."
+  // ===== Policy anchors =====
   const anchors = {
-    iphoneMaxPrevYear: "iPhone 15 Pro Max", // last year's Max/Pro Max
-    galaxyUltraPrevYear: "Galaxy S24 Ultra", // last year's Ultra
-    pixelPrevGen: "Pixel 8",                 // previous-generation Pixel
-    // Optional add to broaden coverage:
-    pixelCurrentGen: "Pixel 9",
+    // Latest standard devices (must-have)
+    latestStandardIphone: "iPhone 16",
+    latestStandardGalaxy: "Galaxy S25",
+
+    // Last-year flagships (must-have)
+    iphoneMaxPrevYear: "iPhone 15 Pro Max",
+    galaxyUltraPrevYear: "Galaxy S24 Ultra",
+
+    // Pixel policy
+    pixelPrevGen: "Pixel 8",
+    pixelCurrentGen: "Pixel 9", // optional for stock-Android coverage
   };
 
-  // Build recommendations (policy-first)
+  // Build recommendations (policy first)
   const recommended: Recommendation[] = [
-    { platform: "iOS",     model: anchors.iphoneMaxPrevYear,   why: "Policy: last year's iPhone Pro/Pro Max (Max model)" },
-    { platform: "Android", model: anchors.galaxyUltraPrevYear, why: "Policy: last year's Samsung Galaxy S Ultra" },
-    { platform: "Android", model: anchors.pixelPrevGen,        why: "Policy: previous-generation Google Pixel" },
-    { platform: "Android", model: anchors.pixelCurrentGen,     why: "Broaden Android coverage (stock Android)" },
+    { platform: "iOS",     model: anchors.latestStandardIphone,  why: "Policy: latest standard iPhone" },
+    { platform: "Android", model: anchors.latestStandardGalaxy,  why: "Policy: latest standard Galaxy S" },
+    { platform: "iOS",     model: anchors.iphoneMaxPrevYear,     why: "Policy: last year's iPhone Pro/Pro Max (Max model)" },
+    { platform: "Android", model: anchors.galaxyUltraPrevYear,   why: "Policy: last year's Samsung Galaxy S Ultra" },
+    { platform: "Android", model: anchors.pixelPrevGen,          why: "Policy: previous-generation Google Pixel" },
+    { platform: "Android", model: anchors.pixelCurrentGen,       why: "Broaden Android coverage (stock Android)" },
   ];
 
   // Add popular iPhones from data (avoid duplicates)
@@ -181,19 +187,16 @@ export default async function Page() {
         <h2 style={{ fontSize: 18, fontWeight: 600, color: "#fff" }}>Sources & Methodology</h2>
         <ul style={{ marginTop: 8, lineHeight: 1.8 }}>
           <li>
-            <strong>Vendor share:</strong> <a href="https://gs.statcounter.com/vendor-market-share/mobile/united-states-of-america" target="_blank" rel="noreferrer">StatCounter GlobalStats</a> (US, mobile vendors). We snapshot monthly and display the latest available month. Good for understanding iOS vs Android vendor mix.
+            <strong>Policy rules:</strong> Always test on <em>latest standard iPhone</em> and <em>latest standard Galaxy S</em>, plus last year’s <em>iPhone Pro/Pro Max</em> and <em>Galaxy S Ultra</em>, and the <em>previous-generation Pixel</em>. These cover mainstream + high-end device classes likely to expose layout/perf issues early.
           </li>
           <li>
-            <strong>iPhone model usage:</strong> <a href="https://telemetrydeck.com" target="_blank" rel="noreferrer">TelemetryDeck</a> publishes iOS device model charts from opt-in app telemetry; we mirror their top models for directional popularity.
+            <strong>Vendor share:</strong> StatCounter GlobalStats (US, mobile vendors). We snapshot monthly to provide iOS/Android vendor context.
           </li>
           <li>
-            <strong>Android model breakdown:</strong> public, free model-level US data is limited. For high-confidence device-level sales/usage, retailers typically use paid panels like <a href="https://www.counterpointresearch.com" target="_blank" rel="noreferrer">Counterpoint Research</a>, <a href="https://www.idc.com" target="_blank" rel="noreferrer">IDC</a>, or <a href="https://www.canalys.com" target="_blank" rel="noreferrer">Canalys</a>. If available, we can integrate these via a server-side connector.
+            <strong>iPhone model usage:</strong> TelemetryDeck iOS device model charts (opt-in telemetry, directional popularity).
           </li>
           <li>
-            <strong>First-party analytics (recommended):</strong> connect your own GA4/Firebase/Mixpanel to surface the top devices actually visiting your sites; this gives the highest confidence for your audience.
-          </li>
-          <li>
-            <strong>Policy rules:</strong> Always test on last year’s iPhone <em>Pro/Pro Max</em> and last year’s Samsung <em>Galaxy S Ultra</em>, plus previous-gen Pixel. These represent demanding, high-resolution devices that surface layout/performance issues early, while staying cost-effective.
+            <strong>Android model detail:</strong> Public, free model-level US data is limited; for high-confidence breakdowns, use paid panels (Counterpoint, IDC, Canalys) or your own GA4/Firebase/Mixpanel.
           </li>
         </ul>
       </section>
