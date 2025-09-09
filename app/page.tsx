@@ -149,7 +149,7 @@ async function getRecommendations(): Promise<{ data: ApiPayload; error?: string 
   } catch (e) {
     return { data: FALLBACK, error: `GET ${url} failed: ${String(e)}` };
   }
-}
+
 
 
   try {
