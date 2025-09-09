@@ -1,6 +1,7 @@
 // app/page.tsx
 import { headers, cookies } from "next/headers";
 
+
 // ---------- Types (match /api/recommendations) ----------
 type Platform = "iOS" | "Android";
 
@@ -95,12 +96,37 @@ const UPCOMING_RELEASES: UpcomingRelease[] = [
 import { headers } from "next/headers";
 
 // ---------- Server fetch ----------
+// ---------- Server fetch ----------
 async function getRecommendations(): Promise<{ data: ApiPayload; error?: string }> {
-  // Build absolute URL from current request
+  // Build absolute URL for the current request (works local + Vercel)
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
   const url = `${proto}://${host}/api/recommendations`;
+
+  // Forward viewer cookies (includes Vercel protection cookie, if present)
+  const cookieHeader = cookies().getAll().map(c => `${c.name}=${c.value}`).join("; ");
+
+  // Optional: add protection bypass header if you set the env var in Vercel
+  const hdrs: Record<string, string> = { cookie: cookieHeader };
+  if (process.env.VERCEL_DEPLOYMENT_PROTECTION_BYPASS) {
+    hdrs["x-vercel-protection-bypass"] =
+      process.env.VERCEL_DEPLOYMENT_PROTECTION_BYPASS as string;
+  }
+
+  try {
+    const res = await fetch(url, { cache: "no-store", headers: hdrs });
+    if (!res.ok) {
+      const body = await res.text();
+      return { data: FALLBACK, error: `GET ${url} → ${res.status} ${body.slice(0, 120)}` };
+    }
+    const json = (await res.json()) as ApiPayload;
+    return { data: json };
+  } catch (e) {
+    return { data: FALLBACK, error: `GET ${url} failed: ${String(e)}` };
+  }
+}
+
 
   // Forward the viewer's cookies (includes the protection cookie if present)
   const cookieHeader = cookies().getAll().map(c => `${c.name}=${c.value}`).join("; ");
