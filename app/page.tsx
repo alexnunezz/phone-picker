@@ -1,5 +1,4 @@
 // app/page.tsx
-import { headers } from "next/headers";
 
 // ---------- Types ----------
 type IPhoneModel = { model: string; share: number };
@@ -14,21 +13,15 @@ type Recommendation = {
   why: string;
 };
 
-// ---------- Helpers ----------
-function getBaseUrl() {
-  const host = headers().get("host");
-  const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
-  return `${protocol}://${host}`;
-}
-
+// ---------- Data fetchers (use relative paths so this works in dev + Vercel) ----------
 async function getIphoneModels(): Promise<IPhoneModelsResp> {
-  const res = await fetch(`${getBaseUrl()}/api/iphone-models`, { cache: "no-store" });
+  const res = await fetch("/api/iphone-models", { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to load /api/iphone-models: ${res.status}`);
   return res.json() as Promise<IPhoneModelsResp>;
 }
 
 async function getUsVendors(): Promise<VendorsResp> {
-  const res = await fetch(`${getBaseUrl()}/api/us-vendors`, { cache: "no-store" });
+  const res = await fetch("/api/us-vendors", { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to load /api/us-vendors: ${res.status}`);
   return res.json() as Promise<VendorsResp>;
 }
@@ -37,14 +30,15 @@ async function getUsVendors(): Promise<VendorsResp> {
 export default async function Page() {
   const [iphone, vendors] = await Promise.all([getIphoneModels(), getUsVendors()]);
 
-  // Policy anchors
+  // ---- Policy anchors (edit these when new models launch) ----
   const anchors = {
-    latestIphone: "iPhone 16",
-    latestGalaxy: "Galaxy S25",
-    previousPixel: "Pixel 8",
-    currentPixel: "Pixel 9",
+    latestIphone: "iPhone 16", // Always support latest standard iPhone
+    latestGalaxy: "Galaxy S25", // Always support latest standard Galaxy S
+    previousPixel: "Pixel 8",   // Always support previous-gen Pixel
+    currentPixel: "Pixel 9",    // Optional: add current-gen Pixel for stock Android coverage
   };
 
+  // ---- Build recommendations ----
   const recommended: Recommendation[] = [
     { platform: "iOS",     model: anchors.latestIphone,  why: "Always support latest standard iPhone" },
     { platform: "Android", model: anchors.latestGalaxy,  why: "Always support latest standard Galaxy S" },
@@ -52,7 +46,7 @@ export default async function Page() {
     { platform: "Android", model: anchors.currentPixel,  why: "Broaden Android coverage (stock Android)" },
   ];
 
-  // Add top iPhone models (avoid duplicates)
+  // Add popular iPhones from data (avoid duplicates)
   const seen = new Set<string>(recommended.map((d) => d.model));
   iphone.models.forEach((m: IPhoneModel) => {
     if (!seen.has(m.model)) {
@@ -92,7 +86,7 @@ export default async function Page() {
         </table>
       </section>
 
-      {/* iPhone data */}
+      {/* iPhone data (from API) */}
       <section style={{ marginTop: 32 }}>
         <h2 style={{ fontSize: 18, fontWeight: 600 }}>Top iPhone Models (snapshot)</h2>
         <ul style={{ marginTop: 8, lineHeight: 1.8 }}>
@@ -105,7 +99,7 @@ export default async function Page() {
         <p style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>Source: /api/iphone-models</p>
       </section>
 
-      {/* Vendor share */}
+      {/* Vendor share (from API) */}
       <section style={{ marginTop: 32 }}>
         <h2 style={{ fontSize: 18, fontWeight: 600 }}>US Vendor Share (snapshot)</h2>
         <table style={{ marginTop: 8, width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
