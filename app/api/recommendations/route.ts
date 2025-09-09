@@ -25,7 +25,7 @@ type ApiPayload = {
   freshnessDays: number;
 };
 
-// ---------- Static data (update any time) ----------
+// ---------- Static data ----------
 const IPHONE_MODELS: ApiPayload["iphoneModels"] = {
   month: "2025-08",
   models: [
@@ -82,7 +82,7 @@ function buildRecommendations(a: Anchors, iphone: IPhoneModel[]): Recommendation
   return base;
 }
 
-// ---------- GET handler (required!) ----------
+// ---------- GET handler ----------
 export async function GET(req: Request) {
   const payload: ApiPayload = {
     anchors: ANCHORS,
@@ -90,6 +90,51 @@ export async function GET(req: Request) {
     iphoneModels: IPHONE_MODELS,
     vendorShare: VENDOR_SHARE,
     sources: [
-      { label: "StatCounter – US mobile vendors", url: "https://gs.statcounter.com/vendor-market-share/mobile/united-states-of-america" },
+      {
+        label: "StatCounter – US mobile vendors",
+        url: "https://gs.statcounter.com/vendor-market-share/mobile/united-states-of-america",
+      },
       { label: "TelemetryDeck – iOS model popularity", url: "https://telemetrydeck.com" },
-      { label: "Apple Newsroom – iPhone launches", url: "http
+      { label: "Apple Newsroom – iPhone launches", url: "https://www.apple.com/newsroom/" },
+      { label: "Samsung Newsroom – Galaxy launches", url: "https://news.samsung.com/global/" },
+      { label: "Google – Pixel releases", url: "https://blog.google/products/pixel/" },
+      { label: "Counterpoint Research", url: "https://www.counterpointresearch.com" },
+      { label: "IDC", url: "https://www.idc.com" },
+      { label: "Canalys", url: "https://www.canalys.com" },
+    ],
+    confidence: { score: 70, label: "medium" },
+    freshnessDays: daysSince(ANCHORS.updatedAt),
+  };
+
+  const url = new URL(req.url);
+  const wantsCsv =
+    url.searchParams.get("format") === "csv" ||
+    (req.headers.get("accept") || "").includes("text/csv");
+
+  if (wantsCsv) {
+    const rows = [
+      ["Platform", "Model", "Why"],
+      ...payload.recommendations.map(r => [r.platform, r.model, r.why]),
+    ];
+    const csv = rows
+      .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
+      .join("\r\n");
+
+    return new Response(csv, {
+      headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": 'attachment; filename="recommended_devices.csv"',
+        "access-control-allow-origin": "*",
+        "cache-control": "no-store",
+      },
+    });
+  }
+
+  return new Response(JSON.stringify(payload), {
+    headers: {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "cache-control": "no-store",
+    },
+  });
+}
